@@ -1,0 +1,81 @@
+---
+title: "Report for Practical Machine Learning"
+subtitle: "Prediction Assignment Writeup"
+author: "Luciano Dominguez"
+date: "October 22, 2015"
+output: html_document
+---
+Setting the Data.
+
+Looking at the csv files that were the input  for this project, trying to interpret what the variables represent, since there was not data dictionary available,  it was evident that from the original 160 variables, 105 variables were with no observations or very scarse observations, so I decided to eliminate those variables directly using Excel. The first variable in the original files was the observation number that when running the preliminary models for prediction produced highly biased results, so it was also removed. I end up with a data frame named “traindata”  with 19,622 observations for  53 covariates and the output variable Classe, which was used for predicting the value of Classe in a data frame named “testdata” with 20 observations for the same 53 covariates an a Problem ID variable.
+
+Partitioning Traindata.
+
+In order to develop the Machine Learning Model that will be used for predicting the Classe value for the “testdata”, it is required to have  some cross validation that will give an estimation of the out of sample error and so  a partition for the “traindata” was done leaving 70 % for training and 30% for testing.
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(caret);library(lattice);library(ggplot2);library("rattle");library("rpart.plot");library(randomForest)
+```
+
+```{r}
+traindata = read.csv("./data/pml-training.csv")
+testdata= read.csv("./data/pml-testing.csv")
+inTrain <- createDataPartition(y=traindata$classe, p=0.75, list=FALSE)
+training <- traindata[inTrain,]
+testing <- traindata[-inTrain,]
+```
+
+It can be checked that the original distribution of frequencies for the Classe variable is preserved  in both the training and the testing data frames, as shown in the following bar charts:
+
+```{r, echo=FALSE, fig.width = 7, fig.height = 14}
+par(mfrow=c(3,1))
+plot(traindata$classe, col = "blue", main="Distribution of Classe from Input Training File")
+plot(training$classe, col = "green", main="Distribution of Classe from Train data derived from Training File")
+plot(testing$classe,col = "yellow",  main="Distribution  of Classe from Test data derived from Training File")
+
+```
+
+Machine Learning Models
+
+The simple model that was first tried was a simple decision tree derived with the method rpart from caret library 
+
+```{r, message=FALSE, warning=FALSE}
+modFit <- train(classe ~ .,method="rpart",data=training)
+fancyRpartPlot(modFit$finalModel)
+```
+
+Which has the folowing results when appplied to the testing partition
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+predictions <- predict(modFit,newdata=testing)
+confusionMatrix(predictions,testing$classe)
+```
+
+As we can see the model is not so good since the accuracy = 0.4892 meaning that an estimation of the out of sample error is 1 - 0.4892 = 0.5107. 
+
+Let´s look at a more precise method: Random Forest
+
+```{r, message=FALSE, warning=FALSE}
+fit <- randomForest(classe ~ . ,  data=training)
+print(fit) 
+```
+
+Notice that I did not take out any of the 53 covariates, the model has done that for me, the confussion matrix within the training data shows that the model is working with a high accuaracy, let´s now aplly the random forest model to the testing patition.
+
+```{r, message=FALSE, warning=FALSE}
+predictions <- predict(fit,newdata=testing)
+confusionMatrix(predictions,testing$classe)
+```
+
+Our model has now an accuracy = 0.992 which is giving us an estimation of the out of sample error of:  
+1 - 0.992 = 0.008, a very precise model.
+
+The final step for the project: the prediction of the Classe values in the 20 observations of the test data:
+
+```{r, message=FALSE, warning=FALSE}
+predictions <- predict(fit,newdata=testdata)
+predictions
+```
+
+Which were 100% valid.
